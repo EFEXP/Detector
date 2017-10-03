@@ -4,12 +4,22 @@ import android.app.IntentService
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.os.AsyncTask
 import android.preference.PreferenceManager
 import android.support.v4.app.NotificationCompat
 import io.realm.Realm
 import twitter4j.*
 import xyz.donot.detector.model.StatusObject
 import xyz.donot.detector.model.UserObject
+import xyz.donot.detector.model.getImageUrls
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.net.HttpURLConnection
+import java.net.MalformedURLException
+import java.net.URL
 
 
 class StreamService : IntentService("StreamService") {
@@ -38,13 +48,19 @@ class StreamService : IntentService("StreamService") {
     inner class MyStreamAdapter: UserStreamAdapter(){
 
         override fun onStatus(x: Status) {
-            val realm=Realm.getDefaultInstance()
+
             if(x.retweetedStatus==null){
+                val realm=Realm.getDefaultInstance()
+                val statusMediaIds=getImageUrls(x)
                     realm.executeTransaction {
                         val s: StatusObject = it.createObject(StatusObject::class.java, x.id)
                         s.status = x.getSerialized()
+                }
+                if(statusMediaIds.isNotEmpty()){
+                    statusMediaIds.forEach { Save(it,x.id) }
+                }
+            }
 
-                }}
         }
 
         override fun onException(ex: Exception) {
@@ -54,7 +70,7 @@ class StreamService : IntentService("StreamService") {
 
         override fun onDeletionNotice(statusDeletionNotice: StatusDeletionNotice) {
             val preference=PreferenceManager.getDefaultSharedPreferences(applicationContext)
-            val myId =Realm.getDefaultInstance().where(UserObject::class.java).findFirst().user!!.getDeserialized<Twitter>().id
+            val myId =Realm.getDefaultInstance().where(UserObject::class.java).findFirst()?.user!!.getDeserialized<Twitter>().id
             //自分を含める
             val includeMe=preference.getBoolean("includeMe",true)
             //これが自分のツイート
@@ -65,7 +81,7 @@ class StreamService : IntentService("StreamService") {
               //  自分のツイートでないか自分を含めかつ自分の
                 if(statusDeletionNotice.userId!= myId||isMyTweet&&includeMe){
                val status=s.status!!.getDeserialized<Status>()
-                    var string= status.user.screenName+"『"+status.text+"』"+preference.getString("tweetText","")+" #黒歴史"
+                    var string= status.user.screenName+"『"+status.text+"』"+preference.getString("tweetText","")+" #ツイ消し感知"
                     if (preference.getBoolean("toMe",true)){
                        string="@null "+string
                     }
@@ -77,5 +93,56 @@ class StreamService : IntentService("StreamService") {
             super.onFavorite(source, target, favoritedStatus)
 
         }
+    }
+    fun Save(stringURL:String,id:Long){
+     val a=  object: AsyncTask< String, Any,Bitmap?>(){
+           override fun doInBackground(vararg p0: String?): Bitmap? {
+ var connection:    HttpURLConnection? = null
+               var  inputStream: InputStream? = null
+               var bitmap: Bitmap?  = null
+
+               try{
+
+       val url: URL =URL(p0[0].toString())
+        connection =url.openConnection() as HttpURLConnection
+                   connection.requestMethod = "GET"
+        connection.connect()
+        inputStream = connection.inputStream
+
+        bitmap = BitmapFactory.decodeStream(inputStream)
+    }catch (exception: MalformedURLException){
+
+    }catch ( exception:IOException){
+
+    }finally {
+        if (connection != null){
+            connection.disconnect()
+        }
+        try{
+            if (inputStream != null){
+                inputStream.close()
+            }
+        }catch (exception:IOException){
+        }
+    }
+
+    return bitmap
+
+           }
+
+           override fun onPostExecute(result: Bitmap?) {
+               if (result!=null){
+               ByteArrayOutputStream().use {
+                  result.compress(Bitmap.CompressFormat.JPEG, 100,it)
+                   val byte :ByteArray= it.toByteArray()
+
+               Realm.getDefaultInstance().executeTransaction {
+                  val statusObject= it.where(StatusObject::class.java).equalTo("statusId",id).findFirst()
+                  statusObject?.picture=byte
+               }  }
+           }}
+       }
+
+        a.execute(stringURL)
     }
 }
