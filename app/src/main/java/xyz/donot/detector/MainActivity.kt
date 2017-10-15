@@ -7,32 +7,33 @@ import android.preference.PreferenceManager
 import android.support.v7.app.AppCompatActivity
 import android.widget.Toast
 import com.google.android.gms.ads.AdRequest
-import io.realm.Realm
+import com.kobakei.ratethisapp.RateThisApp
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.content_main.*
-import xyz.donot.detector.model.StatusObject
-import xyz.donot.detector.model.UserObject
-
-
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.launch
+import xyz.donot.detector.model.AppDatabase
 
 
 class MainActivity : AppCompatActivity() {
-    val realm: Realm by lazy { Realm.getDefaultInstance() }
     override fun onCreate(savedInstanceState: Bundle?) {
+        val dao = AppDatabase.getInstance(this)
         val preference = PreferenceManager.getDefaultSharedPreferences(this)
         super.onCreate(savedInstanceState)
-        val user_ = realm.where(UserObject::class.java)
-        if (preference.getBoolean("initial", true)) {
-            realm.executeTransaction {
-                user_.findAll().deleteAllFromRealm()
-            }
-            preference.edit().putBoolean("initial", false).apply()
-        }
-        if (user_.findAll().isEmpty()) {
+        if (preference.getBoolean("initialize", true)) {
             startActivity(Intent(this@MainActivity, InitialActivity::class.java))
             this.finish()
         } else {
             setContentView(R.layout.activity_main)
+            RateThisApp.onCreate(this)
+            RateThisApp.showRateDialogIfNeeded(this)
+            RateThisApp.init(RateThisApp.Config().also {
+                it.setTitle(R.string.rate)
+                it.setMessage(R.string.my_own_message)
+                it.setUrl(getString(R.string.store_url))
+            })
             setSupportActionBar(toolbar)
             switchButtontxt()
             adView.loadAd(AdRequest.Builder().build())
@@ -40,15 +41,15 @@ class MainActivity : AppCompatActivity() {
             message_checkbox.isChecked = preference.getBoolean("direct_message", true)
             power_text.text = preference.getString("tweetText", "")
             delete_button.setOnClickListener {
-                realm.executeTransaction {
-                    it.where(StatusObject::class.java).findAll().deleteAllFromRealm()
+                launch(UI) {
+                    async(CommonPool) { dao.statusDao().deleteAll() }.await()
                     Toast.makeText(this@MainActivity, "削除しました", Toast.LENGTH_SHORT).show()
                 }
             }
             message_checkbox.setOnCheckedChangeListener({ x, b ->
                 preference.edit().putBoolean("direct_message", b).apply()
             })
-            includeMe.setOnCheckedChangeListener({ x, b ->
+            includeMe.setOnCheckedChangeListener({ _, b ->
                 preference.edit().putBoolean("includeMe", b).apply()
             })
 
@@ -68,8 +69,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     if (Build.VERSION.SDK_INT >= 26) {
                         startForegroundService(Intent(this@MainActivity, StreamingService::class.java))
-                    }
-                   else{
+                    } else {
                         startService(Intent(this@MainActivity, StreamingService::class.java))
                     }
                     app.isConnected = true
@@ -86,11 +86,6 @@ class MainActivity : AppCompatActivity() {
         } else {
             start_service.text = "感知開始"
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        realm.close()
     }
 
 

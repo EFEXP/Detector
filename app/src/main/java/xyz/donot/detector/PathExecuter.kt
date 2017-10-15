@@ -91,8 +91,8 @@ fun getDataColumn(context: Context, uri: Uri, selection: String?,
         cursor = context.contentResolver.query(uri, projection, selection, selectionArgs,
                 null)
         if (cursor != null && cursor.moveToFirst()) {
-            val column_index = cursor.getColumnIndexOrThrow(column)
-            return cursor.getString(column_index)
+            val columnIndex = cursor.getColumnIndexOrThrow(column)
+            return cursor.getString(columnIndex)
         }
     } finally {
         if (cursor != null)

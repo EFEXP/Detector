@@ -7,26 +7,23 @@ import com.google.android.gms.ads.MobileAds
 import com.twitter.sdk.android.core.Twitter
 import com.twitter.sdk.android.core.TwitterAuthConfig
 import com.twitter.sdk.android.core.TwitterConfig
-import io.realm.Realm
-import io.realm.RealmConfiguration
 import twitter4j.Status
-import xyz.donot.detector.model.UserObject
-import java.io.*
+import java.io.ByteArrayOutputStream
+import java.io.ObjectOutputStream
+import java.io.Serializable
 import java.text.BreakIterator
 import java.util.regex.Pattern
 
 
+
+
 class Detector : Application() {
     var isConnected = false
+
     override fun onCreate() {
         super.onCreate()
         val twitterConfig = TwitterConfig.Builder(this).twitterAuthConfig(TwitterAuthConfig(this.getString(R.string.twitter_consumer_key), this.getString(R.string.twitter_consumer_secret))).build()
         Twitter.initialize(twitterConfig)
-        Realm.init(this)
-        val config = RealmConfiguration.Builder()
-                .deleteRealmIfMigrationNeeded()
-                .build()
-        Realm.setDefaultConfiguration(config)
         MobileAds.initialize(applicationContext, "ca-app-pub-1408046229935275~9337272741")
         isConnected= isServiceWorking()
     }
@@ -34,6 +31,7 @@ class Detector : Application() {
         val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         return manager.getRunningServices(Integer.MAX_VALUE).any { StreamingService::class.java.name == it.service.className }
     }
+
 }
 
 fun <T : Serializable> T.getSerialized(): ByteArray {
@@ -44,23 +42,6 @@ fun <T : Serializable> T.getSerialized(): ByteArray {
         return it.toByteArray()
     }
 }
-
-fun getTwitter(): twitter4j.Twitter = Realm.getDefaultInstance().use {
-    return it.where(UserObject::class.java).findFirst()?.user!!.getDeserialized()
-}
-
-fun <T> ByteArray.getDeserialized(): T {
-    @Suppress("UNCHECKED_CAST")
-    return ObjectInputStream(ByteArrayInputStream(this)).readObject() as T
-}
-
-
-fun getMyId(): Long = Realm.getDefaultInstance().use {
-    return it.where(UserObject::class.java).findFirst()!!.id
-}
-
-
-
 fun getExpandedText(status: Status): String {
     var text:String = status.text
     if (status.displayTextRangeStart>=0&&status.displayTextRangeEnd>=0) {
@@ -69,16 +50,6 @@ fun getExpandedText(status: Status): String {
     for   (url in status.urlEntities) {
         text =  Pattern.compile(url.url).matcher(text).replaceAll(url.expandedURL)
     }
-
-    /* for (url in status.urlEntities) {
-         text =  Pattern.compile(url.url).matcher(text).replaceAll(url.displayURL)
-     }
-     for (url in status.mediaEntities) {
-         text = Pattern.compile(url.url).matcher(text).replaceAll("")
-     }
-     for (screen in status.userMentionEntities) {
-         text = Pattern.compile("@"+screen.screenName).matcher(text).replaceAll("")
-     }*/
     return text
 }
 

@@ -1,12 +1,26 @@
 package xyz.donot.detector.model
 
-import io.realm.RealmObject
-import io.realm.annotations.PrimaryKey
+import android.arch.persistence.room.*
+import twitter4j.Status
 
 
+@Entity(tableName = "status")
+class StatusEntity(
+        val status: Status,
+        @PrimaryKey(autoGenerate = false) val  statusId: Long
+)
 
-open class StatusObject : RealmObject() {
-    open  var status: ByteArray? =null
-    open  var picture: ByteArray? =null
-    @PrimaryKey open  var statusId: Long =0L
+@Dao
+interface StatusDao {
+    @Query("SELECT * FROM status WHERE statusId =:statusId LIMIT 1")
+    fun findById(statusId: Long):StatusEntity
+
+    @Query("DELETE FROM status")
+    fun deleteAll()
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertStatus(status:StatusEntity)
 }
+
+
+

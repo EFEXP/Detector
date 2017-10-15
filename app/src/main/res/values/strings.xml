@@ -1,6 +1,9 @@
 <resources>
-    <string name="app_name">Detector</string>
-    <string name="action_settings">Settings</string>
-    <string name="banner_ad_unit_id">ca-app-pub-1408046229935275/6244205543</string>
+  <string name="app_name">Detector</string>
+  <string name="action_settings">Settings</string>
+  <string name="banner_ad_unit_id">ca-app-pub-1408046229935275/6244205543</string>
   <string name="tracking_tag"> #ツイ消し感知</string>
+  <string name="rate">評価</string>
+  <string name="my_own_message">今後のアップデートの継続や機能追加のために、このアプリを評価していただけないでしょうか？</string>
+  <string name="store_url"><![CDATA[https://play.google.com/store/apps/details?id=xyz.donot.detector&hl=ja]]></string>
 </resources>
